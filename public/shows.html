@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TVHomeRun - Shows</title>
+
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <!-- Custom CSS -->
+  <link href="/css/style.css" rel="stylesheet">
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar navbar-dark">
+    <div class="container-fluid" style="padding: 0 40px;">
+      <span class="navbar-brand mb-0">TVHomeRun</span>
+    </div>
+  </nav>
+
+  <!-- Shows Grid -->
+  <div id="showsContainer" class="shows-grid">
+    <!-- Loading spinner will be shown here initially -->
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- API Client -->
+  <script src="/js/api-client.js"></script>
+  <!-- Utils -->
+  <script src="/js/utils.js"></script>
+
+  <script>
+    // Initialize and load shows on page load
+    initializeAndLoadShows();
+
+    async function initializeAndLoadShows() {
+      const container = document.getElementById('showsContainer');
+      showLoading(container);
+
+      try {
+        // Initialize API client with backend URL from server
+        await apiClient.initialize();
+
+        // Load shows
+        await loadShows();
+      } catch (error) {
+        console.error('Failed to initialize:', error);
+        container.innerHTML = `
+          <div class="empty-state">
+            <i class="bi bi-exclamation-triangle"></i>
+            <h2>Initialization Error</h2>
+            <p>${error.message}</p>
+            <p>Please check that the backend server is running and accessible.</p>
+            <button class="btn btn-primary mt-3" onclick="location.reload()">
+              <i class="bi bi-arrow-clockwise"></i> Retry
+            </button>
+          </div>
+        `;
+      }
+    }
+
+    async function loadShows() {
+      const container = document.getElementById('showsContainer');
+      showLoading(container);
+
+      try {
+        const data = await apiClient.getShows();
+        const shows = data.shows || [];
+
+        if (shows.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <i class="bi bi-tv"></i>
+              <h2>No Shows Found</h2>
+              <p>No recorded shows available. Check your HDHomeRun DVR.</p>
+            </div>
+          `;
+          return;
+        }
+
+        // Render shows grid
+        container.innerHTML = shows.map(show => `
+          <a href="/episodes.html?showId=${show.id}" class="show-card">
+            <img src="${getImageURL(show.image_url)}" alt="${show.title}" loading="lazy">
+            <div class="show-card-body">
+              <div class="show-card-title">${show.title}</div>
+              <div class="show-card-meta">
+                ${capitalize(show.category)} • ${show.episode_count} episode${show.episode_count !== 1 ? 's' : ''}
+              </div>
+            </div>
+          </a>
+        `).join('');
+      } catch (error) {
+        console.error('Failed to load shows:', error);
+        container.innerHTML = `
+          <div class="empty-state">
+            <i class="bi bi-exclamation-triangle"></i>
+            <h2>Error Loading Shows</h2>
+            <p>${error.message}</p>
+            <button class="btn btn-primary mt-3" onclick="loadShows()">
+              <i class="bi bi-arrow-clockwise"></i> Retry
+            </button>
+          </div>
+        `;
+        showError('Failed to load shows: ' + error.message);
+      }
+    }
+  </script>
+</body>
+</html>

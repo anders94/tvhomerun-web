@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TVHomeRun - Player</title>
+
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <!-- Custom CSS -->
+  <link href="/css/style.css" rel="stylesheet">
+</head>
+<body>
+  <div class="player-container">
+    <!-- Player Header -->
+    <div class="player-header" id="playerHeader">
+      <div class="player-title" id="playerTitle">Loading...</div>
+      <button class="btn-close-player" onclick="closePlayer()">
+        <i class="bi bi-x-lg"></i> Close
+      </button>
+    </div>
+
+    <!-- Video Wrapper -->
+    <div class="video-wrapper" id="videoWrapper">
+      <video id="videoPlayer" controls></video>
+
+      <!-- Loading Overlay -->
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Player Controls -->
+    <div class="player-controls" id="playerControls">
+      <div class="progress-bar-container">
+        <div class="progress" id="progressContainer">
+          <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+        </div>
+        <div class="time-display">
+          <span id="currentTime">0:00</span>
+          <span id="duration">0:00</span>
+        </div>
+      </div>
+
+      <div class="controls-buttons">
+        <button class="control-btn" id="prevBtn" onclick="previousEpisode()" disabled>
+          <i class="bi bi-skip-start-fill"></i> Previous
+        </button>
+        <button class="control-btn" onclick="skipBackward()">
+          <i class="bi bi-arrow-counterclockwise"></i> -15s
+        </button>
+        <button class="control-btn play-pause" id="playPauseBtn" onclick="togglePlayPause()">
+          <i class="bi bi-play-fill" id="playPauseIcon"></i>
+        </button>
+        <button class="control-btn" onclick="skipForward()">
+          <i class="bi bi-arrow-clockwise"></i> +30s
+        </button>
+        <button class="control-btn" id="nextBtn" onclick="nextEpisode()" disabled>
+          Next <i class="bi bi-skip-end-fill"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- HLS.js -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <!-- API Client -->
+  <script src="/js/api-client.js"></script>
+  <!-- Utils -->
+  <script src="/js/utils.js"></script>
+
+  <script>
+    // Get episodeId from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const episodeId = urlParams.get('episodeId');
+
+    if (!episodeId) {
+      window.history.back();
+    }
+
+    // Player state
+    let video = document.getElementById('videoPlayer');
+    let hls = null;
+    let currentEpisode = null;
+    let allEpisodes = [];
+    let currentEpisodeIndex = -1;
+    let progressUpdateInterval = null;
+    let lastSavedPosition = 0;
+    let controlsTimeout = null;
+    let isMouseMoving = false;
+
+    // Initialize API client and player
+    initializeAndStartPlayer();
+
+    async function initializeAndStartPlayer() {
+      try {
+        await apiClient.initialize();
+        await initPlayer();
+      } catch (error) {
+        console.error('Failed to initialize:', error);
+        document.getElementById('loadingOverlay').innerHTML = `
+          <div class="text-center text-white">
+            <i class="bi bi-exclamation-triangle" style="font-size: 48px;"></i>
+            <p class="mt-3">Initialization Error: ${error.message}</p>
+            <button class="btn btn-primary" onclick="window.history.back()">Go Back</button>
+          </div>
+        `;
+      }
+    }
+
+    async function initPlayer() {
+      try {
+        // Load episode details
+        currentEpisode = await apiClient.getEpisode(episodeId);
+        document.getElementById('playerTitle').textContent =
+          `${currentEpisode.title || currentEpisode.episode_title} - ${currentEpisode.episode_number || ''}`;
+        document.title = `${currentEpisode.episode_title || currentEpisode.title} - TVHomeRun`;
+
+        // Load all episodes for this show
+        const showData = await apiClient.getEpisodes(currentEpisode.series_id);
+        allEpisodes = showData.episodes || [];
+        currentEpisodeIndex = allEpisodes.findIndex(ep => ep.id == episodeId);
+
+        // Enable/disable next/prev buttons
+        document.getElementById('prevBtn').disabled = currentEpisodeIndex <= 0;
+        document.getElementById('nextBtn').disabled = currentEpisodeIndex >= allEpisodes.length - 1;
+
+        // Load video
+        const streamURL = apiClient.getStreamURL(episodeId);
+        loadVideo(streamURL);
+
+        // Setup progress tracking
+        setupProgressTracking();
+
+        // Setup controls auto-hide
+        setupControlsAutoHide();
+      } catch (error) {
+        console.error('Failed to load episode:', error);
+        showError('Failed to load video: ' + error.message);
+        document.getElementById('loadingOverlay').innerHTML = `
+          <div class="text-center text-white">
+            <i class="bi bi-exclamation-triangle" style="font-size: 48px;"></i>
+            <p class="mt-3">${error.message}</p>
+            <button class="btn btn-primary" onclick="closePlayer()">Go Back</button>
+          </div>
+        `;
+      }
+    }
+
+    function loadVideo(url) {
+      if (Hls.isSupported()) {
+        hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: false,
+          backBufferLength: 90
+        });
+
+        hls.loadSource(url);
+        hls.attachMedia(video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          console.log('HLS manifest loaded');
+          // Seek to resume position if available
+          if (currentEpisode.resume_position > 0) {
+            video.currentTime = currentEpisode.resume_position;
+          }
+          video.play().catch(e => console.log('Auto-play prevented:', e));
+        });
+
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          console.error('HLS error:', data);
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                console.log('Network error, trying to recover...');
+                hls.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                console.log('Media error, trying to recover...');
+                hls.recoverMediaError();
+                break;
+              default:
+                showError('Fatal error loading video');
+                break;
+            }
+          }
+        });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Native HLS support (Safari)
+        video.src = url;
+        video.addEventListener('loadedmetadata', () => {
+          if (currentEpisode.resume_position > 0) {
+            video.currentTime = currentEpisode.resume_position;
+          }
+          video.play().catch(e => console.log('Auto-play prevented:', e));
+        });
+      } else {
+        showError('HLS not supported in this browser');
+      }
+
+      // Video event listeners
+      video.addEventListener('loadeddata', () => {
+        document.getElementById('loadingOverlay').style.display = 'none';
+      });
+
+      video.addEventListener('waiting', () => {
+        document.getElementById('loadingOverlay').style.display = 'flex';
+      });
+
+      video.addEventListener('playing', () => {
+        document.getElementById('loadingOverlay').style.display = 'none';
+        updatePlayPauseButton();
+      });
+
+      video.addEventListener('pause', () => {
+        updatePlayPauseButton();
+      });
+
+      video.addEventListener('timeupdate', () => {
+        updateProgressBar();
+      });
+
+      video.addEventListener('ended', () => {
+        onVideoEnded();
+      });
+    }
+
+    function setupProgressTracking() {
+      // Save progress every 30 seconds
+      progressUpdateInterval = setInterval(async () => {
+        const currentTime = Math.floor(video.currentTime);
+        const duration = Math.floor(video.duration);
+
+        // Only save if position changed by more than 5 seconds
+        if (Math.abs(currentTime - lastSavedPosition) > 5) {
+          // Don't save if within last 30 seconds (to avoid marking as incomplete)
+          if (currentTime < duration - 30) {
+            try {
+              await apiClient.updateProgress(episodeId, currentTime, false);
+              lastSavedPosition = currentTime;
+              console.log('Progress saved:', currentTime);
+            } catch (error) {
+              console.error('Failed to save progress:', error);
+            }
+          }
+        }
+      }, 30000); // 30 seconds
+    }
+
+    async function onVideoEnded() {
+      // Mark as watched
+      try {
+        await apiClient.updateProgress(episodeId, Math.floor(video.duration), true);
+        console.log('Marked as watched');
+
+        // Auto-play next episode
+        if (currentEpisodeIndex < allEpisodes.length - 1) {
+          setTimeout(() => nextEpisode(), 2000);
+        }
+      } catch (error) {
+        console.error('Failed to mark as watched:', error);
+      }
+    }
+
+    function setupControlsAutoHide() {
+      const playerHeader = document.getElementById('playerHeader');
+      const playerControls = document.getElementById('playerControls');
+      let hideTimeout;
+
+      function showControls() {
+        playerHeader.classList.remove('hidden');
+        playerControls.classList.remove('hidden');
+        document.body.style.cursor = 'default';
+
+        // Clear existing timeout
+        if (hideTimeout) clearTimeout(hideTimeout);
+
+        // Hide after 5 seconds if playing
+        if (!video.paused) {
+          hideTimeout = setTimeout(() => {
+            playerHeader.classList.add('hidden');
+            playerControls.classList.add('hidden');
+            document.body.style.cursor = 'none';
+          }, 5000);
+        }
+      }
+
+      // Show controls on mouse move
+      document.addEventListener('mousemove', showControls);
+
+      // Show controls on click
+      video.addEventListener('click', showControls);
+
+      // Always show controls when paused
+      video.addEventListener('pause', showControls);
+      video.addEventListener('play', showControls);
+
+      // Initial show
+      showControls();
+    }
+
+    function togglePlayPause() {
+      if (video.paused) {
+        video.play();
+      } else {
+        video.pause();
+      }
+    }
+
+    function updatePlayPauseButton() {
+      const icon = document.getElementById('playPauseIcon');
+      if (video.paused) {
+        icon.className = 'bi bi-play-fill';
+      } else {
+        icon.className = 'bi bi-pause-fill';
+      }
+    }
+
+    function updateProgressBar() {
+      const progress = (video.currentTime / video.duration) * 100;
+      document.getElementById('progressBar').style.width = progress + '%';
+      document.getElementById('currentTime').textContent = formatTime(video.currentTime);
+      document.getElementById('duration').textContent = formatTime(video.duration);
+    }
+
+    function skipForward() {
+      video.currentTime = Math.min(video.currentTime + 30, video.duration);
+    }
+
+    function skipBackward() {
+      video.currentTime = Math.max(video.currentTime - 15, 0);
+    }
+
+    function nextEpisode() {
+      if (currentEpisodeIndex < allEpisodes.length - 1) {
+        const nextEp = allEpisodes[currentEpisodeIndex + 1];
+        window.location.href = `/player.html?episodeId=${nextEp.id}`;
+      }
+    }
+
+    function previousEpisode() {
+      if (currentEpisodeIndex > 0) {
+        const prevEp = allEpisodes[currentEpisodeIndex - 1];
+        window.location.href = `/player.html?episodeId=${prevEp.id}`;
+      }
+    }
+
+    async function closePlayer() {
+      // Save final position
+      const currentTime = Math.floor(video.currentTime);
+      const duration = Math.floor(video.duration);
+
+      try {
+        // Mark as watched if within last 30 seconds
+        const watched = duration - currentTime < 30;
+        await apiClient.updateProgress(episodeId, currentTime, watched);
+      } catch (error) {
+        console.error('Failed to save progress:', error);
+      }
+
+      // Cleanup
+      if (progressUpdateInterval) {
+        clearInterval(progressUpdateInterval);
+      }
+      if (hls) {
+        hls.destroy();
+      }
+
+      // Go back
+      window.history.back();
+    }
+
+    // Progress bar seeking
+    document.getElementById('progressContainer').addEventListener('click', (e) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const percent = (e.clientX - rect.left) / rect.width;
+      video.currentTime = percent * video.duration;
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', async () => {
+      if (progressUpdateInterval) {
+        clearInterval(progressUpdateInterval);
+      }
+
+      const currentTime = Math.floor(video.currentTime);
+      const duration = Math.floor(video.duration);
+      const watched = duration - currentTime < 30;
+
+      // Use sendBeacon for reliable save on unload
+      const data = JSON.stringify({
+        position: currentTime,
+        watched: watched ? 1 : 0
+      });
+
+      navigator.sendBeacon(
+        `${apiClient.getBaseURL()}/api/episodes/${episodeId}/progress`,
+        new Blob([data], { type: 'application/json' })
+      );
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      switch(e.key) {
+        case ' ':
+        case 'k':
+          e.preventDefault();
+          togglePlayPause();
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          skipBackward();
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          skipForward();
+          break;
+        case 'f':
+          e.preventDefault();
+          if (document.fullscreenElement) {
+            document.exitFullscreen();
+          } else {
+            video.requestFullscreen();
+          }
+          break;
+      }
+    });
+  </script>
+</body>
+</html>

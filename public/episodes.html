@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TVHomeRun - Episodes</title>
+
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <!-- Custom CSS -->
+  <link href="/css/style.css" rel="stylesheet">
+</head>
+<body>
+  <!-- Header -->
+  <div class="episodes-header">
+    <button class="btn btn-link text-white mb-3" onclick="goBack()" style="font-size: 20px; text-decoration: none;">
+      <i class="bi bi-chevron-left"></i> Back to Shows
+    </button>
+    <h1 id="showTitle">Loading...</h1>
+  </div>
+
+  <!-- Episodes List -->
+  <div id="episodesContainer" class="episodes-list">
+    <!-- Loading spinner will be shown here initially -->
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- API Client -->
+  <script src="/js/api-client.js"></script>
+  <!-- Utils -->
+  <script src="/js/utils.js"></script>
+
+  <script>
+    // Get showId from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const showId = urlParams.get('showId');
+
+    if (!showId) {
+      window.location.href = '/shows.html';
+    }
+
+    // Initialize and load episodes on page load
+    initializeAndLoadEpisodes();
+
+    async function initializeAndLoadEpisodes() {
+      try {
+        await apiClient.initialize();
+        await loadEpisodes();
+      } catch (error) {
+        console.error('Failed to initialize:', error);
+        const container = document.getElementById('episodesContainer');
+        container.innerHTML = `
+          <div class="empty-state">
+            <i class="bi bi-exclamation-triangle"></i>
+            <h2>Initialization Error</h2>
+            <p>${error.message}</p>
+            <button class="btn btn-primary mt-3" onclick="location.reload()">
+              <i class="bi bi-arrow-clockwise"></i> Retry
+            </button>
+          </div>
+        `;
+      }
+    }
+
+    async function loadEpisodes() {
+      const container = document.getElementById('episodesContainer');
+      showLoading(container);
+
+      try {
+        const data = await apiClient.getEpisodes(showId);
+        const episodes = data.episodes || [];
+        const show = data.show;
+
+        // Update page title
+        if (show) {
+          document.getElementById('showTitle').textContent = show.title;
+          document.title = `${show.title} - TVHomeRun`;
+        }
+
+        if (episodes.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <i class="bi bi-film"></i>
+              <h2>No Episodes Found</h2>
+              <p>No episodes available for this show.</p>
+            </div>
+          `;
+          return;
+        }
+
+        // Render episodes list
+        container.innerHTML = episodes.map(episode => renderEpisode(episode)).join('');
+      } catch (error) {
+        console.error('Failed to load episodes:', error);
+        container.innerHTML = `
+          <div class="empty-state">
+            <i class="bi bi-exclamation-triangle"></i>
+            <h2>Error Loading Episodes</h2>
+            <p>${error.message}</p>
+            <button class="btn btn-primary mt-3" onclick="loadEpisodes()">
+              <i class="bi bi-arrow-clockwise"></i> Retry
+            </button>
+          </div>
+        `;
+        showError('Failed to load episodes: ' + error.message);
+      }
+    }
+
+    function renderEpisode(episode) {
+      const duration = episode.duration_minutes ? episode.duration_minutes * 60 : episode.duration || 0;
+      const progress = calculateProgress(episode.resume_position, duration);
+      const watched = isWatched(episode);
+      const showResume = shouldShowResume(episode);
+
+      let overlay = '';
+      if (watched) {
+        overlay = '<div class="episode-thumbnail-overlay watched"><i class="bi bi-check-lg"></i></div>';
+      } else if (showResume) {
+        overlay = '<div class="episode-thumbnail-overlay resume"><i class="bi bi-play-fill"></i></div>';
+      }
+
+      return `
+        <a href="/player.html?episodeId=${episode.id}" class="episode-card">
+          <div class="episode-thumbnail-wrapper">
+            <img src="${getImageURL(episode.image_url)}" alt="${episode.episode_title || episode.title}" class="episode-thumbnail" loading="lazy">
+            ${overlay}
+            ${progress > 0 ? `<div class="episode-progress-bar" style="width: ${progress}%"></div>` : ''}
+          </div>
+          <div class="episode-content">
+            <div class="episode-number">${episode.episode_number || 'Episode'}</div>
+            <div class="episode-title">${episode.episode_title || episode.title}</div>
+            <div class="episode-synopsis">${episode.synopsis || 'No description available.'}</div>
+            <div class="episode-meta">
+              <span><i class="bi bi-calendar"></i> ${formatAirDate(episode.start_time)}</span>
+              <span><i class="bi bi-clock"></i> ${formatDuration(duration)}</span>
+              <span><i class="bi bi-broadcast"></i> ${episode.channel_number}</span>
+              ${showResume ? `<span><i class="bi bi-play-circle"></i> Resume ${formatDuration(episode.resume_position)}</span>` : ''}
+            </div>
+          </div>
+        </a>
+      `;
+    }
+
+    function goBack() {
+      window.location.href = '/shows.html';
+    }
+
+    // Reload episodes when page becomes visible (to update watch status)
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        loadEpisodes();
+      }
+    });
+  </script>
+</body>
+</html>
