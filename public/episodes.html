@@ -122,7 +122,8 @@
       let overlay = '';
       if (watched) {
         overlay = '<div class="episode-thumbnail-overlay watched"><i class="bi bi-check-lg"></i></div>';
-      } else if (showResume) {
+      } else {
+        // Show play icon on all unwatched episodes
         overlay = '<div class="episode-thumbnail-overlay resume"><i class="bi bi-play-fill"></i></div>';
       }
 

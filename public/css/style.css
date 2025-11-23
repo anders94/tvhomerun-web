@@ -214,19 +214,20 @@ body {
 
 .episode-thumbnail-overlay {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   background-color: rgba(0, 0, 0, 0.7);
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
+  width: 60px;
+  height: 60px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .episode-thumbnail-overlay i {
-  font-size: 20px;
+  font-size: 28px;
 }
 
 .episode-thumbnail-overlay.watched {
