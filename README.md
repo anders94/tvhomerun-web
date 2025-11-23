@@ -1,6 +1,6 @@
 # TVHomeRun Web
 
-A modern web frontend for TVHomeRun backend, built with Node.js, Express, and Bootstrap. Provides a user-friendly interface for browsing and watching recorded TV shows from your HDHomeRun DVR.
+A modern web frontend for [tvhomerun-backend](https://github.com/anders94/tvhomerun-backend). Provides a user-friendly interface for browsing and watching recorded TV shows from your HDHomeRun DVR.
 
 ## Features
 
