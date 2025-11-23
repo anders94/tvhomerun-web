@@ -40,10 +40,10 @@
 
     if (!showId) {
       window.location.href = '/shows.html';
+    } else {
+      // Initialize and load episodes on page load
+      initializeAndLoadEpisodes();
     }
-
-    // Initialize and load episodes on page load
-    initializeAndLoadEpisodes();
 
     async function initializeAndLoadEpisodes() {
       try {
@@ -66,6 +66,10 @@
     }
 
     async function loadEpisodes() {
+      if (!showId) {
+        return;
+      }
+
       const container = document.getElementById('episodesContainer');
       showLoading(container);
 

@@ -24,13 +24,20 @@
 
     <!-- Video Wrapper -->
     <div class="video-wrapper" id="videoWrapper">
-      <video id="videoPlayer" controls></video>
+      <video id="videoPlayer" controls autoplay></video>
 
       <!-- Loading Overlay -->
       <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner-border text-primary" role="status">
           <span class="visually-hidden">Loading...</span>
         </div>
+      </div>
+
+      <!-- Unmute Notification -->
+      <div class="unmute-notification" id="unmuteNotification" style="display: none;">
+        <button class="btn btn-primary" onclick="unmuteVideo()">
+          <i class="bi bi-volume-up-fill"></i> Click to Unmute
+        </button>
       </div>
     </div>
 
@@ -117,7 +124,8 @@
     async function initPlayer() {
       try {
         // Load episode details
-        currentEpisode = await apiClient.getEpisode(episodeId);
+        const episodeData = await apiClient.getEpisode(episodeId);
+        currentEpisode = episodeData.episode;
         document.getElementById('playerTitle').textContent =
           `${currentEpisode.title || currentEpisode.episode_title} - ${currentEpisode.episode_number || ''}`;
         document.title = `${currentEpisode.episode_title || currentEpisode.title} - TVHomeRun`;
@@ -153,6 +161,35 @@
       }
     }
 
+    async function attemptAutoPlay() {
+      try {
+        // Try playing with sound
+        await video.play();
+        console.log('Auto-play started with sound');
+      } catch (error) {
+        console.log('Auto-play with sound prevented, trying muted...');
+        try {
+          // Mute and try again
+          video.muted = true;
+          await video.play();
+          console.log('Auto-play started muted');
+          // Show unmute button
+          document.getElementById('unmuteNotification').style.display = 'flex';
+          // Auto-hide after 5 seconds
+          setTimeout(() => {
+            document.getElementById('unmuteNotification').style.display = 'none';
+          }, 5000);
+        } catch (mutedError) {
+          console.error('Auto-play failed even when muted:', mutedError);
+        }
+      }
+    }
+
+    function unmuteVideo() {
+      video.muted = false;
+      document.getElementById('unmuteNotification').style.display = 'none';
+    }
+
     function loadVideo(url) {
       if (Hls.isSupported()) {
         hls = new Hls({
@@ -170,7 +207,7 @@
           if (currentEpisode.resume_position > 0) {
             video.currentTime = currentEpisode.resume_position;
           }
-          video.play().catch(e => console.log('Auto-play prevented:', e));
+          attemptAutoPlay();
         });
 
         hls.on(Hls.Events.ERROR, (event, data) => {
@@ -198,7 +235,7 @@
           if (currentEpisode.resume_position > 0) {
             video.currentTime = currentEpisode.resume_position;
           }
-          video.play().catch(e => console.log('Auto-play prevented:', e));
+          attemptAutoPlay();
         });
       } else {
         showError('HLS not supported in this browser');
