@@ -159,6 +159,14 @@
         loadEpisodes();
       }
     });
+
+    // Reload episodes when returning from player via back button
+    window.addEventListener('pageshow', (event) => {
+      // event.persisted is true if page is loaded from cache (back/forward navigation)
+      if (event.persisted) {
+        loadEpisodes();
+      }
+    });
   </script>
 </body>
 </html>
