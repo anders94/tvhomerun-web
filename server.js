@@ -27,8 +27,30 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'shows.html'));
 });
 
+// Error handlers for uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
 // Start the server
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`TVHomeRun Web Server running on http://${HOST}:${PORT}`);
   console.log(`Backend URL configured as: ${BACKEND_URL}`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Error: Port ${PORT} is already in use`);
+  } else if (err.code === 'EACCES') {
+    console.error(`Error: Permission denied to bind to port ${PORT}`);
+  } else {
+    console.error('Server error:', err);
+  }
+  process.exit(1);
 });
