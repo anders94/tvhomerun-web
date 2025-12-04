@@ -136,6 +136,7 @@
       const progress = calculateProgress(episode.resume_position, duration);
       const watched = isWatched(episode);
       const showResume = shouldShowResume(episode);
+      const cacheSize = formatBytes(episode.hls_cache_bytes);
 
       let overlay = '';
       if (watched) {
@@ -152,6 +153,7 @@
               <img src="${getImageURL(episode.image_url)}" alt="${episode.episode_title || episode.title}" class="episode-thumbnail" loading="lazy">
               ${overlay}
               ${progress > 0 ? `<div class="episode-progress-bar" style="width: ${progress}%"></div>` : ''}
+              ${cacheSize ? `<div class="episode-cache-badge" title="HLS cache size"><i class="bi bi-hdd"></i> ${cacheSize}</div>` : ''}
             </div>
             <div class="episode-content">
               <div class="episode-number">${episode.episode_number || 'Episode'}</div>

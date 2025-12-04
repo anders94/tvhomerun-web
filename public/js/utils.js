@@ -145,3 +145,23 @@ function capitalize(str) {
   if (!str) return '';
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
+
+// Format bytes to human-readable size
+function formatBytes(bytes) {
+  if (!bytes || bytes === 0) return '';
+
+  const units = ['B', 'K', 'M', 'G', 'T'];
+  const k = 1024;
+
+  if (bytes < k) return bytes + 'B';
+
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const value = bytes / Math.pow(k, i);
+
+  // Show one decimal place for values >= 10, no decimals for < 10
+  if (value >= 10) {
+    return Math.round(value) + units[i];
+  } else {
+    return value.toFixed(1) + units[i];
+  }
+}
