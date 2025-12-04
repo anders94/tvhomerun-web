@@ -182,6 +182,8 @@
     function showDeleteModal(episodeId, episodeTitle) {
       episodeToDelete = episodeId;
 
+      const modal = document.getElementById('deleteModal');
+
       // Reset modal state
       document.getElementById('deleteModalText').textContent =
         `Are you sure you want to delete "${episodeTitle}"?`;
@@ -192,12 +194,24 @@
       deleteBtn.disabled = false;
       deleteBtn.textContent = 'Delete';
 
-      // Show modal
-      document.getElementById('deleteModal').style.display = 'block';
+      // Show modal (hidden initially)
+      modal.style.display = 'block';
+      modal.style.opacity = '0';
+
+      // Use requestAnimationFrame to ensure positioning happens before showing
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          modal.style.opacity = '1';
+        });
+      });
     }
 
     function closeDeleteModal() {
-      document.getElementById('deleteModal').style.display = 'none';
+      const modal = document.getElementById('deleteModal');
+      modal.style.opacity = '0';
+      setTimeout(() => {
+        modal.style.display = 'none';
+      }, 200); // Match the CSS transition duration
       episodeToDelete = null;
     }
 

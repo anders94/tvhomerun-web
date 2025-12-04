@@ -583,7 +583,7 @@ body {
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.8);
   z-index: 1000;
-  animation: fadeIn 0.2s ease;
+  transition: opacity 0.2s ease;
 }
 
 .modal-content {
@@ -597,7 +597,6 @@ body {
   max-width: 500px;
   width: 90%;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  animation: slideUp 0.3s ease;
 }
 
 .modal-content h2 {
@@ -673,17 +672,6 @@ body {
 .modal-buttons .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-@keyframes slideUp {
-  from {
-    transform: translate(-50%, -45%);
-    opacity: 0;
-  }
-  to {
-    transform: translate(-50%, -50%);
-    opacity: 1;
-  }
 }
 
 /* Scrollbar Styling */
