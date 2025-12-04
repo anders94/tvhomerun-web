@@ -27,7 +27,7 @@
   </div>
 
   <!-- Delete Confirmation Modal -->
-  <div class="modal-overlay" id="deleteModal" style="display: none;">
+  <div class="modal-overlay" id="deleteModal" style="display: none;" onclick="if(event.target === this) closeDeleteModal()">
     <div class="modal-content">
       <h2>Delete Episode?</h2>
       <p id="deleteModalText">Are you sure you want to delete this episode?</p>
@@ -181,10 +181,19 @@
 
     function showDeleteModal(episodeId, episodeTitle) {
       episodeToDelete = episodeId;
+
+      // Reset modal state
       document.getElementById('deleteModalText').textContent =
         `Are you sure you want to delete "${episodeTitle}"?`;
       document.getElementById('rerecordCheckbox').checked = false;
-      document.getElementById('deleteModal').style.display = 'flex';
+
+      // Reset delete button
+      const deleteBtn = document.querySelector('.modal-content .btn-danger');
+      deleteBtn.disabled = false;
+      deleteBtn.textContent = 'Delete';
+
+      // Show modal
+      document.getElementById('deleteModal').style.display = 'block';
     }
 
     function closeDeleteModal() {
@@ -220,7 +229,7 @@
 
     // Close modal on ESC key
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && document.getElementById('deleteModal').style.display === 'flex') {
+      if (e.key === 'Escape' && document.getElementById('deleteModal').style.display === 'block') {
         closeDeleteModal();
       }
     });
