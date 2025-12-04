@@ -146,7 +146,7 @@
       }
 
       return `
-        <div class="episode-card-wrapper">
+        <div class="episode-card-wrapper" data-episode-id="${episode.id}">
           <a href="/player.html?episodeId=${episode.id}" class="episode-card">
             <div class="episode-thumbnail-wrapper">
               <img src="${getImageURL(episode.image_url)}" alt="${episode.episode_title || episode.title}" class="episode-thumbnail" loading="lazy">
@@ -226,13 +226,26 @@
         deleteBtn.disabled = true;
         deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Deleting...';
 
+        // Delete via API
         await apiClient.deleteEpisode(episodeToDelete, rerecord);
 
         closeDeleteModal();
-        showSuccess('Episode deleted successfully');
 
-        // Reload episodes list
-        await loadEpisodes();
+        // Find and remove the episode element from DOM
+        const episodeElement = document.querySelector(`.episode-card-wrapper[data-episode-id="${episodeToDelete}"]`);
+        if (episodeElement) {
+          // Fade out animation
+          episodeElement.style.opacity = '0';
+          episodeElement.style.transform = 'translateX(-20px)';
+          episodeElement.style.transition = 'all 0.3s ease';
+
+          setTimeout(() => {
+            episodeElement.remove();
+            showSuccess('Episode deleted successfully');
+          }, 300);
+        } else {
+          showSuccess('Episode deleted successfully');
+        }
       } catch (error) {
         console.error('Failed to delete episode:', error);
         showError('Failed to delete episode: ' + error.message);
