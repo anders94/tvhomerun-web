@@ -229,10 +229,11 @@
         // Delete via API
         await apiClient.deleteEpisode(episodeToDelete, rerecord);
 
-        closeDeleteModal();
-
         // Find and remove the episode element from DOM
         const episodeElement = document.querySelector(`.episode-card-wrapper[data-episode-id="${episodeToDelete}"]`);
+        console.log('Looking for episode:', episodeToDelete);
+        console.log('Found element:', episodeElement);
+
         if (episodeElement) {
           // Fade out animation
           episodeElement.style.opacity = '0';
@@ -241,11 +242,15 @@
 
           setTimeout(() => {
             episodeElement.remove();
+            console.log('Episode removed from DOM');
             showSuccess('Episode deleted successfully');
           }, 300);
         } else {
+          console.error('Could not find episode element to remove');
           showSuccess('Episode deleted successfully');
         }
+
+        closeDeleteModal();
       } catch (error) {
         console.error('Failed to delete episode:', error);
         showError('Failed to delete episode: ' + error.message);
