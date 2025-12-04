@@ -157,6 +157,12 @@ class APIClient {
     const url = `${this.baseURL}/api/discover`;
     return await this.fetchWithRetry(url, { method: 'POST' });
   }
+
+  // Delete episode
+  async deleteEpisode(episodeId, rerecord = false) {
+    const url = `${this.baseURL}/api/episodes/${episodeId}?rerecord=${rerecord}`;
+    return await this.fetchWithRetry(url, { method: 'DELETE' });
+  }
 }
 
 // Create singleton instance

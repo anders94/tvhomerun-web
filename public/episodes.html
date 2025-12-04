@@ -26,6 +26,24 @@
     <!-- Loading spinner will be shown here initially -->
   </div>
 
+  <!-- Delete Confirmation Modal -->
+  <div class="modal-overlay" id="deleteModal" style="display: none;">
+    <div class="modal-content">
+      <h2>Delete Episode?</h2>
+      <p id="deleteModalText">Are you sure you want to delete this episode?</p>
+      <div class="modal-checkbox">
+        <label>
+          <input type="checkbox" id="rerecordCheckbox">
+          Allow this episode to be recorded again in the future
+        </label>
+      </div>
+      <div class="modal-buttons">
+        <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+        <button class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <!-- API Client -->
@@ -128,30 +146,84 @@
       }
 
       return `
-        <a href="/player.html?episodeId=${episode.id}" class="episode-card">
-          <div class="episode-thumbnail-wrapper">
-            <img src="${getImageURL(episode.image_url)}" alt="${episode.episode_title || episode.title}" class="episode-thumbnail" loading="lazy">
-            ${overlay}
-            ${progress > 0 ? `<div class="episode-progress-bar" style="width: ${progress}%"></div>` : ''}
-          </div>
-          <div class="episode-content">
-            <div class="episode-number">${episode.episode_number || 'Episode'}</div>
-            <div class="episode-title">${episode.episode_title || episode.title}</div>
-            <div class="episode-synopsis">${episode.synopsis || 'No description available.'}</div>
-            <div class="episode-meta">
-              <span><i class="bi bi-calendar"></i> ${formatAirDate(episode.start_time)}</span>
-              <span><i class="bi bi-clock"></i> ${formatDuration(duration)}</span>
-              <span><i class="bi bi-broadcast"></i> ${episode.channel_number}</span>
-              ${showResume ? `<span><i class="bi bi-play-circle"></i> Resume ${formatDuration(episode.resume_position)}</span>` : ''}
+        <div class="episode-card-wrapper">
+          <a href="/player.html?episodeId=${episode.id}" class="episode-card">
+            <div class="episode-thumbnail-wrapper">
+              <img src="${getImageURL(episode.image_url)}" alt="${episode.episode_title || episode.title}" class="episode-thumbnail" loading="lazy">
+              ${overlay}
+              ${progress > 0 ? `<div class="episode-progress-bar" style="width: ${progress}%"></div>` : ''}
             </div>
-          </div>
-        </a>
+            <div class="episode-content">
+              <div class="episode-number">${episode.episode_number || 'Episode'}</div>
+              <div class="episode-title">${episode.episode_title || episode.title}</div>
+              <div class="episode-synopsis">${episode.synopsis || 'No description available.'}</div>
+              <div class="episode-meta">
+                <span><i class="bi bi-calendar"></i> ${formatAirDate(episode.start_time)}</span>
+                <span><i class="bi bi-clock"></i> ${formatDuration(duration)}</span>
+                <span><i class="bi bi-broadcast"></i> ${episode.channel_number}</span>
+                ${showResume ? `<span><i class="bi bi-play-circle"></i> Resume ${formatDuration(episode.resume_position)}</span>` : ''}
+              </div>
+            </div>
+          </a>
+          <button class="btn-delete-episode" onclick="showDeleteModal(${episode.id}, '${(episode.episode_title || episode.title).replace(/'/g, "\\'")}'); event.stopPropagation();" title="Delete episode">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
       `;
     }
 
     function goBack() {
       window.location.href = '/shows.html';
     }
+
+    // Delete modal state
+    let episodeToDelete = null;
+
+    function showDeleteModal(episodeId, episodeTitle) {
+      episodeToDelete = episodeId;
+      document.getElementById('deleteModalText').textContent =
+        `Are you sure you want to delete "${episodeTitle}"?`;
+      document.getElementById('rerecordCheckbox').checked = false;
+      document.getElementById('deleteModal').style.display = 'flex';
+    }
+
+    function closeDeleteModal() {
+      document.getElementById('deleteModal').style.display = 'none';
+      episodeToDelete = null;
+    }
+
+    async function confirmDelete() {
+      if (!episodeToDelete) return;
+
+      const rerecord = document.getElementById('rerecordCheckbox').checked;
+      const deleteBtn = document.querySelector('.modal-content .btn-danger');
+      const originalText = deleteBtn.textContent;
+
+      try {
+        deleteBtn.disabled = true;
+        deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Deleting...';
+
+        await apiClient.deleteEpisode(episodeToDelete, rerecord);
+
+        closeDeleteModal();
+        showSuccess('Episode deleted successfully');
+
+        // Reload episodes list
+        await loadEpisodes();
+      } catch (error) {
+        console.error('Failed to delete episode:', error);
+        showError('Failed to delete episode: ' + error.message);
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = originalText;
+      }
+    }
+
+    // Close modal on ESC key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && document.getElementById('deleteModal').style.display === 'flex') {
+        closeDeleteModal();
+      }
+    });
 
     // Reload episodes when page becomes visible (to update watch status)
     document.addEventListener('visibilitychange', () => {
